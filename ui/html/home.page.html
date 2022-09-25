@@ -1,0 +1,44 @@
+{{template "base" .}}
+
+{{define "title"}}home{{end}}
+
+
+{{define "main"}}
+<div class="row">
+  <div class="col-sm-6">
+<h3>Application Summary</h3>
+<hr>
+<p>This summary is not a substitute for reading the U3 documentaton.  It is only
+a summary of what is implemented in this program which is a limited set of
+LabJack U3 functions.  LabJack U3 is a delicate instrument and a number of
+percautions must be excercised while using it.</p>
+<p>This project is implemented in two phases</p>
+<bl>
+  <li>Phase 1: Analog and digital inputs and outputs</li>
+  <li>Phase 2: Timers and counters</li>
+  </bl>
+  <br>
+  <p>Timers and counters implement many simple and complex functions and after
+    a review of the needs, specific functions will be built</p>
+    <h4>High Voltage Analog Inputs</h4>
+    <p>Pins labled AIN0 through AIN3 are permanently set to high voltage Analog
+    inputs (0-10 volts) and are not programmable.</p>
+    <h4>Flexible I/O Lines</h4>
+    <p>Lines FIO4 through FIO7 (on the screw terminals) and lines EIO0 through
+    EIO7 (on DB15 connector) are flexible IO pins and can be programmed as digital
+  input, digital output, or analog input channels.  See the link "Configure U3"
+on the navigation bar on top of this page.</p>
+<h4>Dedicated Digital IO Lines</h4>
+<p>Lines CIO0 through CIO3 (on the DB25 connector) are digital only pins.  They
+  can be prgrammed as digital input or output.  See the link "Configure U3" on the
+  navigation bar on top of this page).</p>
+  <h4>Temperature Sensor</h4>
+  <p>The temperature sensor is not programmable but it can be read<p>
+  </div>
+  <div class="col-sm-1"></div>
+  <div class="col-sm-5">
+    <img src="/static/img/u3.png" alt="U3" width="400" height="725">
+  </div>
+</div>
+
+{{end}}
