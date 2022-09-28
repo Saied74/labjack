@@ -1,0 +1,148 @@
+{{template "base" .}}
+
+{{define "title"}}configure{{end}}
+
+{{define "main"}}
+<div class="Row">
+  <h2 class="mx-auto" style="width: 200px;">Configuration</h2>
+</div>
+<hr>
+<div class="row">
+  <div class="col-sm-9">
+  <form action="/configure" method="post">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Pin</th>
+      {{range $n, $val := .EIO}}
+      <th class="text-center" scope="col">{{$n}}</th>
+      {{end}}
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">EIO</th>
+      {{range $n, $val := .EIO}}
+      <td>
+      <select class="form-select" aria-label="EIOAD{{$n}}" name="eioAD{{$n}}">
+        <option value="1" {{if eq $val.AD "Digital"}}selected{{end}}>Digital</option>
+        <option value="2" {{if eq $val.AD "Analog"}}selected{{end}}>Analog</option>
+      </select>
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row"></th>
+      {{range $n, $val := .EIO}}
+      <td>
+        {{if eq $val.AD "Digital"}}
+        <select class="form-select" aria-label="EIOIO{{$n}}" name="eioIO{{$n}}">
+          <!-- <option selected>Open this select menu</option> -->
+          <option value="1" {{if eq $val.IO "Input"}}selected{{end}}>Input</option>
+          <option value="2" {{if eq $val.IO "Output"}}selected{{end}}>Output</option>
+        </select>
+        {{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">FIO</th>
+      {{range $n, $val := .FIO}}
+      <td class="text-center">
+        {{if lt $n 4}}
+        {{$val.AD}}
+        {{end}}
+          {{if gt $n 3}}
+        <select class="form-select" aria-label="FIOAD{{$n}}" name="fioAD{{$n}}">
+          <option value="1" {{if eq $val.AD "Digital"}}selected{{end}}>Digital</option>
+          <option value="2" {{if eq $val.AD "Analog"}}selected{{end}}>Analog</option>
+        </select>
+        {{end}}
+        </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row"></th>
+      {{range $n, $val := .FIO}}
+      <td>
+        {{if eq $val.AD "Digital"}}
+        <select class="form-select" aria-label="FIOIO{{$n}}" name="fioIO{{$n}}">
+          <!-- <option selected>Open this select menu</option> -->
+          <option value="1" {{if eq $val.IO "Input"}}selected{{end}}>Input</option>
+          <option value="2" {{if eq $val.IO "Output"}}selected{{end}}>Output</option>
+        </select>
+        {{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">CIO</th>
+      {{range $n, $val := .CIO}}
+      <td class="text-center">{{.AD}}</td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row"></th>
+      {{range $n, $val := .CIO}}
+      <td>
+        {{if eq $val.AD "Digital"}}
+        <select class="form-select" aria-label="CIOIO{{$n}}" name="cioIO{{$n}}">
+          <option value="1" {{if eq $val.IO "Input"}}selected{{end}}>Input</option>
+          <option value="2" {{if eq $val.IO "Output"}}selected{{end}}>Output</option>
+        </select>
+        {{end}}
+      </td>
+      {{end}}
+    </tr>
+  </tbody>
+</table>
+<button type="submit" class="btn btn-primary">Configure</button>
+</form>
+<br>
+    </div>
+
+  <!-- <div class="col-sm-1"></div> -->
+  <div class="col-sm-3">
+    <table class="table">
+    <thead>
+      <tr>
+        <th scope="col">Parameter</th>
+        <th scope="col">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th scope="row">Device Name</th>
+        <td colspan="2">{{.DeviceName}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Firmware Version</th>
+        <td>{{.FirmwareVersion}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Boot Loader Version</th>
+        <td>{{.BootLoaderVersion}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Hardware Version</th>
+        <td>{{.HardwareVersion}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Serial Number</th>
+        <td>{{.SerialNumber}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Product ID</th>
+        <td>{{.ProductID}}</td>
+      </tr>
+      <tr>
+        <th scope="row">Local ID</th>
+        <td>{{.LocalID}}</td>
+      </tr>
+    </tbody>
+  </table>
+  <h4 class="center">Message:  {{.Message}}</h4>
+</div>
+</div>
+
+{{end}}
