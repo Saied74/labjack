@@ -17,6 +17,76 @@ const (
 	vReg           = "VReg"
 )
 
+/*
+Pin is the model for each of the U3 device pins.  It can either be loaded
+from the flash device memory or from the voltaile device memory.  It is not
+instanciated directly.  It is a component of the U3 type.
+*/
+type Pin struct {
+	AD            string  //Analog or digital
+	IO            string  //Input or Output
+	AnalogRead    int     //A/D convertor raw read
+	AnalogVoltage float64 //Analog read convergted to voltage
+	DigitalRead   int     //only one and zero allowed
+	DigitalWrite  int     //only one and zero allowed
+}
+
+/*
+U3 is a model of the U3 device.  The FIO, EIO, and CIO fields are described
+on the home page and in the device documentation under low level function
+reference.  The rest of the fields should be self explanatory from their names.
+They are updated from the device flash memory.
+
+U3 is also the template data that will processed by the template parser to
+build the web pages.
+
+This is a violation of the MVC design pattern of sorts, but one can argue That
+the model is really the U3 device memory (sort of)
+*/
+type U3 struct {
+	FIO               []*Pin
+	EIO               []*Pin
+	CIO               []*Pin
+	FirmwareVersion   string
+	BootLoaderVersion string
+	HardwareVersion   string
+	SerialNumber      string
+	ProductID         string
+	LocalID           string
+	DeviceName        string
+	Message           string
+	open              bool
+}
+
+/*
+functions newPin and newU3 are constructed in the hope that refrence to the
+results will not cause nil pointer refrence panic.
+*/
+
+//Builds a blank instance of the Pin type.
+func newPin() *Pin {
+	return &Pin{}
+}
+
+//builds a blank instance of the U3 type.
+func newU3() *U3 {
+	u3 := U3{}
+	for i := 0; i < 8; i++ {
+		u3.EIO = append(u3.EIO, newPin())
+		u3.FIO = append(u3.FIO, newPin())
+		u3.CIO = append(u3.CIO, newPin())
+	}
+	u3.Message = "No Message"
+	return &u3
+}
+
+/*
+u3srData type is the model for each individual U3 command.  The send and recieved
+lengths for each command are different.  Also, the meaning of each byte is different
+for each commmand and commmand type.  For this reason, they are documented inline
+in the buildU3SRData function for each command.  The names of the commands are
+the same as the names of the commands in the documentation.
+*/
 type u3srElement struct {
 	sendLength  int
 	recLength   int
@@ -35,22 +105,27 @@ type u3srElement struct {
 	buildBytes  func(*u3srElement, []byte, byte)
 }
 
+//u3srData type is the collection of all the commands available for the U3 device
 type u3srData map[string]*u3srElement
 
+/*
+
+ */
 func buildU3srData() u3srData {
 	return u3srData{
-		configJack: &u3srElement{
-			sendLength:  26,
-			recLength:   38,
-			byte1:       0xF8,
-			byte2:       0x0A,
-			byte3:       0x08,
-			byte6:       0x00,
-			byte7:       0x00,
-			checkReturn: checkJack,
-			buildBytes:  buildJackSendBuffer,
+		configJack: &u3srElement{ //ConfigU3 changed to configJack (older naming conflict)
+			sendLength:  26,                  //to make the sendBuffer in u3SendRec function.
+			recLength:   38,                  //to make the recBuffer in the u3SendRec function
+			byte1:       0xF8,                //per device low level function reference
+			byte2:       0x0A,                //per device low level function refrence
+			byte3:       0x08,                //per device low level function refrence
+			byte6:       0x00,                //per device low level function refrence
+			byte7:       0x00,                //per device low level function refrence
+			checkReturn: checkJack,           //call to check the validity of the returned bytes
+			buildBytes:  buildJackSendBuffer, //call to form the send bytes.
 		},
-		configIO: &u3srElement{
+		//Analog or digital nature of pins is set with this command, it does not impact flash
+		configIO: &u3srElement{ //all fields the same as configJack fields.
 			sendLength:  12,
 			recLength:   12,
 			byte1:       0xF8,
@@ -61,84 +136,87 @@ func buildU3srData() u3srData {
 			checkReturn: checkIO,
 			buildBytes:  buildJackSendBuffer,
 		},
-		ain: &u3srElement{
+		//the following are all subcommands of the "feedback" command.
+		ain: &u3srElement{ //read analog pin voltage
 			sendLength: 10,
 			recLength:  11,
-			byte1:      0xF8,
-			byte2:      3,
+			byte1:      0xF8, //per device low level function refrence
+			byte2:      3,    //number of words (two byte pairs) startying with byte 6
 			byte3:      0x00,
 			byte6:      0,
-			byte7:      1,
+			byte7:      1, //feedback subcommand
 		},
-		led: &u3srElement{
+		led: &u3srElement{ //set led state (on or off)
 			sendLength: 9,
 			recLength:  9,
 			byte1:      0xF8,
-			byte2:      2,
+			byte2:      2, //number of words (two byte pairs) startying with byte 6
 			byte3:      0x00,
 			byte6:      0,
-			byte7:      9,
+			byte7:      9, //feedback subcommand
 		},
-		portStateRead: &u3srElement{
+		portStateRead: &u3srElement{ //read the state of digital input pins, high or low
 			sendLength: 8,
 			recLength:  10,
 			byte1:      0xF8,
-			byte2:      2,
+			byte2:      2, //number of words (two byte pairs) startying with byte 6
 			byte3:      0x00,
 			byte6:      0,
-			byte7:      10,
+			byte7:      10, //feedback subcommand
 		},
-		portStateWrite: &u3srElement{
+		portStateWrite: &u3srElement{ //write the state of digital output pins (high or low)
 			sendLength: 14,
 			recLength:  11,
 			byte1:      0xF8,
-			byte2:      7,
+			byte2:      7, //number of words (two byte pairs) startying with byte 6
 			byte3:      0x00,
 			byte6:      0,
-			byte7:      27,
+			byte7:      27, //feedback subcommand
 		},
-		portDirRead: &u3srElement{
+		portDirRead: &u3srElement{ //read the direction of the digital pins, input or output
 			sendLength:  8,
 			recLength:   12,
 			byte1:       0xF8,
-			byte2:       1,
+			byte2:       1, //number of words (two byte pairs) startying with byte 6
 			byte3:       0x00,
 			byte6:       0,
-			byte7:       28,
+			byte7:       28, //feedback subcommand
 			checkReturn: checkFeedback,
 			buildBytes:  buildPortDirReadBuffer,
 		},
-		portDirWrite: &u3srElement{
+		portDirWrite: &u3srElement{ //write the direction of digital pins, input or output
 			sendLength:  14,
 			recLength:   10,
 			byte1:       0xF8,
-			byte2:       4,
+			byte2:       4, //number of words (two byte pairs) startying with byte 6
 			byte3:       0x00,
 			byte6:       0,
-			byte7:       29,
+			byte7:       29, //feedback subcommand
 			checkReturn: checkFeedback,
 			buildBytes:  buildPortDirWriteBuffer,
 		},
-		tempSense: &u3srElement{
+		tempSense: &u3srElement{ // read temperature
 			sendLength: 8,
 			recLength:  11,
 			byte1:      0xF8,
-			byte2:      1,
+			byte2:      1, //number of words (two byte pairs) startying with byte 6
 			byte3:      0x00,
 			byte6:      0,
-			byte7:      30,
+			byte7:      30, //feedback subcommand
 		},
-		vReg: &u3srElement{
+		vReg: &u3srElement{ //I don't know what this reads, we will find out.
 			sendLength: 8,
 			recLength:  11,
 			byte1:      0xF8,
-			byte2:      1,
+			byte2:      1, //number of words (two byte pairs) startying with byte 6
 			byte3:      0x00,
 			byte6:      0,
-			byte7:      31,
+			byte7:      31, //feedback subcommand
 		},
 	}
 }
+
+//<+++++++++++++++++++ Check Methods for Commands to the Device +++++++++++++++>
 
 func checkJack(sr *u3srElement, recBuffer []byte) error {
 	if recBuffer[0] == 0xB8 && recBuffer[1] == 0xB8 {
@@ -201,27 +279,9 @@ func checkFeedback(sr *u3srElement, recBuffer []byte) error {
 	return nil
 }
 
-// func checkFeedback(sr *u3srElement, recBuffer []byte) error {
-// 	if recBuffer[0] == 0xB8 && recBuffer[1] == 0xB8 {
-// 		return fmt.Errorf("The U3 detected a bad checksum. Double check your checksum calculations and try again")
-// 	} else {
-// 		if recBuffer[1] != sr.byte1 || recBuffer[2] != sr.byte2 || recBuffer[3] != sr.byte3 {
-// 			return fmt.Errorf("Got the wrong command bytes back from the U3")
-// 		}
-//
-// 		checksum16 := calculateChecksum16(recBuffer, sr.recLength)
-// 		checksum8 := calculateChecksum8(recBuffer)
-// 		if checksum8 != recBuffer[0] || int(recBuffer[4]) != checksum16&0xff || int(recBuffer[5]) != ((checksum16/256)&0xff) {
-// 			return fmt.Errorf("Response had invalid checksum.\n%d != %d, %d != %d, %d != %d", checksum8, recBuffer[0], checksum16&0xff, recBuffer[4], ((checksum16 / 256) & 0xff), recBuffer[5])
-// 		} else {
-// 			if recBuffer[6] != 0 { // Check the error code in the packet. See section 5.3 of the U3
-// 				return fmt.Errorf("Command returned with an errorcode = %d", recBuffer[6])
-// 			}
-// 			return nil
-// 		}
-// 	}
-// }
+//<+++++++++++++ Build Methods for sendBuffer for the commands ++++++++++++++++>
 
+//builds the configU3 command send buffer templated after the vendor C example
 func buildJackSendBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) {
 	copyHead(sr, sendBuffer)
 	sendBuffer[6] = writeMask
@@ -233,6 +293,7 @@ func buildJackSendBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) {
 	addChecksum(sr, sendBuffer)
 }
 
+//templated after the configU3 buffer build provided by the vendor (in C)
 func buildPortDirReadBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) {
 	copyHead(sr, sendBuffer)
 	sendBuffer[6] = writeMask
@@ -240,6 +301,10 @@ func buildPortDirReadBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) 
 	addChecksum(sr, sendBuffer)
 }
 
+/*
+The feedback functions all have a different send and recieve buffer templetaes.
+Hence all send buffer builds will be different.
+*/
 func buildPortDirWriteBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) {
 	copyHead(sr, sendBuffer)
 	for i := 8; i < sr.sendLength; i++ {
@@ -254,6 +319,8 @@ func buildPortDirWriteBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte)
 	addChecksum(sr, sendBuffer)
 }
 
+//<++++++++++++++++++++++++  Helper Functions ++++++++++++++++++++++++++++++++>
+//helper function for building sendBuffer
 func copyHead(sr *u3srElement, sendBuffer []byte) {
 	sendBuffer[1] = sr.byte1
 	sendBuffer[2] = sr.byte2
@@ -262,6 +329,7 @@ func copyHead(sr *u3srElement, sendBuffer []byte) {
 	sendBuffer[7] = sr.byte7
 }
 
+//helper function for building sendbuffer
 func addChecksum(sr *u3srElement, sendBuffer []byte) {
 	checksum := 0
 	checksum = calculateChecksum16(sendBuffer, sr.sendLength)
@@ -270,46 +338,7 @@ func addChecksum(sr *u3srElement, sendBuffer []byte) {
 	sendBuffer[0] = calculateChecksum8(sendBuffer)
 }
 
-type Pin struct {
-	AD            string  //Analog or digital
-	IO            string  //Input or Output
-	AnalogRead    int     //A/D convertor raw read
-	AnalogVoltage float64 //Analog read convergted to voltage
-	DigitalRead   int     //only one and zero allowed
-	DigitalWrite  int     //only one and zero allowed
-}
-
-type U3 struct {
-	FIO               []*Pin
-	EIO               []*Pin
-	CIO               []*Pin
-	FirmwareVersion   string
-	BootLoaderVersion string
-	HardwareVersion   string
-	SerialNumber      string
-	ProductID         string
-	LocalID           string
-	DeviceName        string
-	Message           string
-	open              bool
-}
-
-func newPin() *Pin {
-	return &Pin{}
-}
-
-func newU3() *U3 {
-	u3 := U3{}
-	for i := 0; i < 8; i++ {
-		u3.EIO = append(u3.EIO, newPin())
-		u3.FIO = append(u3.FIO, newPin())
-		u3.CIO = append(u3.CIO, newPin())
-	}
-	u3.Message = "No Message"
-	return &u3
-}
-
-// Calculates the checksum16
+//helper function for building send and checking recieve buffers.
 func calculateChecksum16(buffer []byte, len int) int {
 	checksum := 0
 	for i := 6; i < len; i++ {
@@ -319,6 +348,7 @@ func calculateChecksum16(buffer []byte, len int) int {
 	return checksum
 }
 
+//helper function for building the send and checking the recive buffers.
 func calculateChecksum8(buffer []byte) byte {
 	var temp int // For holding a value while we working.
 	checksum := 0
@@ -334,7 +364,19 @@ func calculateChecksum8(buffer []byte) byte {
 	return byte((checksum - 256*temp) + temp)
 }
 
-// Parses the ConfigU3 packet into something useful.
+// Takes a buffer and an offset, and turns into an 32-bit integer
+func makeInt(buffer []byte, offset int) int {
+	return int((buffer[offset+3] << 24) + (buffer[offset+2] << 16) + (buffer[offset+1] << 8) + buffer[offset])
+}
+
+// Takes a buffer and an offset, and turns into an 16-bit integer
+func makeShort(buffer []byte, offset int) int {
+	return int((buffer[offset+1] << 8) + buffer[offset])
+}
+
+//<++++++++  Functions for mapping the recieve buffer to app.u3 +++++++++++++++>
+
+// Parses the ConfigU3 recBuffer and put them into app.u3.
 func (u *U3) parseConfigU3Bytes(recBuffer []byte) {
 
 	u.FirmwareVersion = fmt.Sprintf("%d.%02d", int(recBuffer[10]), int(recBuffer[9]))
@@ -347,14 +389,6 @@ func (u *U3) parseConfigU3Bytes(recBuffer []byte) {
 	u.parseFlashBytes(recBuffer)
 
 	// fmt.Printf("  TimerCounterMask = %d\n", recBuffer[22])
-	// fmt.Printf("  FIOAnalog = %d\n", recBuffer[23])
-	// fmt.Printf("  FIODireciton = %d\n", recBuffer[24])
-	// fmt.Printf("  FIOState = %d\n", recBuffer[25])
-	// fmt.Printf("  EIOAnalog = %d\n", recBuffer[26])
-	// fmt.Printf("  EIODirection = %d\n", recBuffer[27])
-	// fmt.Printf("  EIOState = %d\n", recBuffer[28])
-	// fmt.Printf("  CIODirection = %d\n", recBuffer[29])
-	// fmt.Printf("  CIOState = %d\n", recBuffer[30])
 	// fmt.Printf("  DAC1Enable = %d\n", recBuffer[31])
 	// fmt.Printf("  DAC0 = %d\n", recBuffer[32])
 	// fmt.Printf("  DAC1 = %d\n", recBuffer[33])
@@ -379,6 +413,7 @@ func (u *U3) parseConfigU3Bytes(recBuffer []byte) {
 
 }
 
+//parse the configIO recieve buffer and map into app.u3
 func (u *U3) parseBitBytes(recBuffer []byte) {
 
 	for i := 0; i < 8; i++ {
@@ -396,6 +431,7 @@ func (u *U3) parseBitBytes(recBuffer []byte) {
 	}
 }
 
+//parse the portDirRead recBuffer and map into app.u3
 func (u *U3) parseDirBits(recBuffer []byte) {
 	for i := 0; i < 8; i++ {
 		if i > 3 {
@@ -417,6 +453,7 @@ func (u *U3) parseDirBits(recBuffer []byte) {
 	}
 }
 
+//helper function for processing FIO, EIO, and CIO bits when reading from flash.
 func (u *U3) parseFlashBytes(recBuffer []byte) {
 	for i := 0; i < 8; i++ {
 		u.FIO[i].AD = "Digital"
@@ -447,14 +484,4 @@ func (u *U3) parseFlashBytes(recBuffer []byte) {
 			}
 		}
 	}
-}
-
-// Takes a buffer and an offset, and turns into an 32-bit integer
-func makeInt(buffer []byte, offset int) int {
-	return int((buffer[offset+3] << 24) + (buffer[offset+2] << 16) + (buffer[offset+1] << 8) + buffer[offset])
-}
-
-// Takes a buffer and an offset, and turns into an 16-bit integer
-func makeShort(buffer []byte, offset int) int {
-	return int((buffer[offset+1] << 8) + buffer[offset])
 }

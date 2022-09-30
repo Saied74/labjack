@@ -1,0 +1,140 @@
+{{template "base" .}}
+
+{{define "title"}}measure{{end}}
+
+{{define "main"}}
+<div class="Row">
+  <h2 class="mx-auto" style="width: 200px;">Measurements</h2>
+</div>
+<hr>
+<div class="row">
+
+  <div class="col-sm-12">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th scope="col">Pin</th>
+      {{range $n, $val := .EIO}}
+      <th class="text-center" scope="col">{{$n}}</th>
+      {{end}}
+    </tr>
+  </thead>
+  <tbody>
+
+
+    <tr>
+      <th scope="row">EIO</th>
+      {{range $n, $val := .EIO}}
+      <td class="text-center">
+        {{$val.AD}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row"></th>
+      {{range $n, $val := .EIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Digital"}}
+        {{$val.IO}}
+        {{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">Read</th>
+      {{range $n, $val := .EIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Digital"}}{{$val.DigitalRead}}{{end}}
+        {{if eq $val.AD "Analog"}}{{$val.AnalogRead}}{{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">Voltage</th>
+      {{range $n, $val := .EIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Analog"}}{{$val.AnalogVoltage}}{{end}}
+      </td>
+      {{end}}
+    </tr>
+
+
+    <tr>
+      <th scope="row">FIO</th>
+      {{range $n, $val := .FIO}}
+      <td class="text-center">
+        {{$val.AD}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row"></th>
+      {{range $n, $val := .FIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Digital"}}
+        {{$val.IO}}
+        {{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">Read</th>
+      {{range $n, $val := .FIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Digital"}}{{$val.DigitalRead}}{{end}}
+        {{if eq $val.AD "Analog"}}{{$val.AnalogRead}}{{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">Voltage</th>
+      {{range $n, $val := .FIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Analog"}}{{$val.AnalogVoltage}}{{end}}
+      </td>
+      {{end}}
+    </tr>
+
+    <tr>
+      <th scope="row">CIO</th>
+      {{range $n, $val := .CIO}}
+      <td class="text-center">
+        {{$val.AD}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row"></th>
+      {{range $n, $val := .CIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Digital"}}
+        {{$val.IO}}
+        {{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">Read</th>
+      {{range $n, $val := .CIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Digital"}}{{$val.DigitalRead}}{{end}}
+        {{if eq $val.AD "Analog"}}{{$val.AnalogRead}}{{end}}
+      </td>
+      {{end}}
+    </tr>
+    <tr>
+      <th scope="row">Voltage</th>
+      {{range $n, $val := .CIO}}
+      <td class="text-center">
+        {{if eq $val.AD "Analog"}}{{$val.AnalogVoltage}}{{end}}
+      </td>
+      {{end}}
+    </tr>
+
+  </tbody>
+</table>
+    </div>
+
+</div>
+
+{{end}}

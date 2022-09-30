@@ -8,13 +8,18 @@ package main
 //#include <errno.h>
 //#include <../../pkg/labjackusb/labjackusb.h>
 //#include <../../pkg/libusb/libusb.h>
-// #include "greeter.h"
 import "C"
 import (
 	"fmt"
 	"unsafe"
 )
 
+//All C dependencies are confined to this file.
+
+/*
+These constants are defined for constructing buffers in the C envirnment.
+C does not deal with variables for array construction.
+*/
 const (
 	eight       = 8
 	nine        = 9
@@ -31,6 +36,7 @@ const (
 func (app *application) u3SendRec(op string, mask byte) {
 	sendBuffer := make([]byte, app.srData[op].sendLength)
 	recBuffer := make([]byte, app.srData[op].recLength)
+	//see labjackusb.h for documentation.
 	devHandle := C.LJUSB_OpenDevice(1, 0, C.U3_PRODUCT_ID)
 	if devHandle == nil {
 		app.u3.Message = fmt.Sprintf("Couldn't open U3. Please connect one and try again %v", devHandle)
@@ -42,32 +48,13 @@ func (app *application) u3SendRec(op string, mask byte) {
 
 	// Write the command to the device.
 	// LJUSB_Write( handle, sendBuffer, length of sendBuffer )
-	sBuff := (*C.uchar)(unsafe.Pointer(&sendBuffer[0]))
-	sBuffLength := C.ulong(app.srData[op].sendLength)
 
+	//pointer to the first byte of the sendBuffer, the way that C likes it.
+	sBuff := (*C.uchar)(unsafe.Pointer(&sendBuffer[0]))
+	//cast go int to C unsighed long
+	sBuffLength := C.ulong(app.srData[op].sendLength)
+	//write to the device.
 	r := C.LJUSB_Write(devHandle, sBuff, sBuffLength) //CONFIGU3_COMMAND_LENGTH)
-	switch op {
-	case configJack:
-		sendBuffer = (*[C.ulong(twentysix)]byte)(unsafe.Pointer(sBuff))[:C.ulong(twentysix):C.ulong(twentysix)]
-	case configIO:
-		sendBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(sBuff))[:C.ulong(twelve):C.ulong(twelve)]
-	case ain:
-		sendBuffer = (*[C.ulong(ten)]byte)(unsafe.Pointer(sBuff))[:C.ulong(ten):C.ulong(ten)]
-	case led:
-		sendBuffer = (*[C.ulong(nine)]byte)(unsafe.Pointer(sBuff))[:C.ulong(nine):C.ulong(nine)]
-	case portStateRead:
-		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
-	case portStateWrite:
-		sendBuffer = (*[C.ulong(fourteen)]byte)(unsafe.Pointer(sBuff))[:C.ulong(fourteen):C.ulong(fourteen)]
-	case portDirRead:
-		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
-	case portDirWrite:
-		sendBuffer = (*[C.ulong(fourteen)]byte)(unsafe.Pointer(sBuff))[:C.ulong(fourteen):C.ulong(fourteen)]
-	case tempSense:
-		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
-	case vReg:
-		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
-	}
 
 	// sendBuffer = (*[sBuffLength]byte)(unsafe.Pointer(sBuff))[:sBuffLength:sBuffLength]
 	if r != sBuffLength {
@@ -120,6 +107,13 @@ func (app *application) u3SendRec(op string, mask byte) {
 		fmt.Println("4: ", app.u3.Message)
 		return
 	}
+	/*
+		Parsing the return bytes and putting the results into the U3 structure were
+		build as methods on U3.  That limits their utility in being called from
+		inside this function.  For now, the switch function will do.  Later, I will
+		refactor them and pass a pointer to the instance of U3 as the first Parameter
+		(just like invoking the method on the structure does)
+	*/
 	switch op {
 	case configJack:
 		app.u3.parseConfigU3Bytes(recBuffer)
