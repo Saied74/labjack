@@ -149,3 +149,39 @@ func (u *U3) pullIO(r url.Values) error {
 	}
 	return nil
 }
+
+func (app *application) copyToWriteJack(op string) {
+	app.srData[op].byte11 = 0x00
+	for i, val := range app.u3.EIO {
+		if val.AD == "Analog" {
+			app.srData[op].byte11 = app.srData[op].byte11 | (1 << i)
+		}
+	}
+	app.srData[op].byte10 = 0x00
+	for i, val := range app.u3.FIO {
+		if i > 3 && val.AD == "Analog" {
+			app.srData[op].byte10 = app.srData[op].byte10 | (1 << i)
+		}
+	}
+}
+
+func (app *application) copyToWriteDirection(op string) {
+	app.srData[op].byte12 = 0x00
+	for i, val := range app.u3.EIO {
+		if val.IO == "Output" {
+			app.srData[op].byte12 = app.srData[op].byte12 | (1 << i)
+		}
+	}
+	app.srData[op].byte11 = 0x00
+	for i, val := range app.u3.FIO {
+		if i > 3 && val.IO == "Output" {
+			app.srData[op].byte11 = app.srData[op].byte11 | (1 << i)
+		}
+	}
+	app.srData[op].byte13 = 0x00
+	for i, val := range app.u3.CIO {
+		if i < 4 && val.IO == "Output" {
+			app.srData[op].byte13 = app.srData[op].byte13 | (1 << i)
+		}
+	}
+}

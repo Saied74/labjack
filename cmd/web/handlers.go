@@ -16,9 +16,14 @@ func (app *application) notImplemented(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, "notimplemented.page.html", nil)
 }
 
+func (app *application) flash(w http.ResponseWriter, r *http.Request) {
+	app.u3SendRec(configJack, 0x00)
+	app.render(w, r, "configure.page.html", app.u3)
+}
+
 func (app *application) getConfig(w http.ResponseWriter, r *http.Request) {
-	app.u3.getU3Config()
-	app.u3.getSetPins(true)
+	app.u3SendRec(configIO, 0x00)
+	app.u3SendRec(portDirRead, 0x00)
 	app.render(w, r, "configure.page.html", app.u3)
 }
 
@@ -32,10 +37,15 @@ func (app *application) configure(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("pullAD returned error", err)
 	}
-	// fmt.Println(r.PostForm)
 	err = app.u3.pullIO(r.PostForm)
 	if err != nil {
 		fmt.Println("pullIO returned error", err)
 	}
+	app.copyToWriteJack(configIO)
+	writeMask := byte(0x0C)
+	app.u3SendRec(configIO, writeMask)
+	app.copyToWriteDirection(portDirWrite)
+	writeMask = byte(0x01) //in this case, it does nothing.  Just to satisfy signature.
+	app.u3SendRec(portDirWrite, writeMask)
 	app.render(w, r, "configure.page.html", app.u3)
 }

@@ -16,231 +16,120 @@ import (
 )
 
 const (
-	CONFIGU3_COMMAND_LENGTH      = 26 // Defines how long the command is
-	CONFIGU3_RESPONSE_LENGTH     = 38 // Defines how long the response is
-	BIT_CONFIGU3_COMMAND_LENGTH  = 12 // Defines how long the command is
-	BIT_CONFIGU3_RESPONSE_LENGTH = 12 // Defines how long the response is
+	eight       = 8
+	nine        = 9
+	ten         = 10
+	eleven      = 11
+	twelve      = 12
+	fourteen    = 14
+	twentysix   = 26
+	thirtyeight = 38
 )
 
-//Specifically not using this function with the Write Mask set to 1 because
-//updating flash ages it.  I am also not using it for reading the IO Pin
-//status because I want to have a function that can read and write the
-//state of the IO pins without updating the flash.
-func (u *U3) getU3Config() {
-	sendBuffer := make([]byte, CONFIGU3_COMMAND_LENGTH)
-	recBuffer := make([]byte, CONFIGU3_RESPONSE_LENGTH)
-
+//This is a generic function for writing to the Labjack U3 and getting
+//the results back
+func (app *application) u3SendRec(op string, mask byte) {
+	sendBuffer := make([]byte, app.srData[op].sendLength)
+	recBuffer := make([]byte, app.srData[op].recLength)
 	devHandle := C.LJUSB_OpenDevice(1, 0, C.U3_PRODUCT_ID)
 	if devHandle == nil {
-		u.Message = fmt.Sprintf("Couldn't open U3. Please connect one and try again")
+		app.u3.Message = fmt.Sprintf("Couldn't open U3. Please connect one and try again %v", devHandle)
+		fmt.Println("1: ", app.u3.Message)
 		return
 	}
 
-	buildConfigU3Bytes(sendBuffer)
+	app.srData[op].buildBytes(app.srData[op], sendBuffer, mask)
 
 	// Write the command to the device.
 	// LJUSB_Write( handle, sendBuffer, length of sendBuffer )
 	sBuff := (*C.uchar)(unsafe.Pointer(&sendBuffer[0]))
-	x := C.ulong(26)
+	sBuffLength := C.ulong(app.srData[op].sendLength)
 
-	r := C.LJUSB_Write(devHandle, sBuff, x) //CONFIGU3_COMMAND_LENGTH)
-	sendBuffer = (*[CONFIGU3_COMMAND_LENGTH]byte)(unsafe.Pointer(sBuff))[:CONFIGU3_COMMAND_LENGTH:CONFIGU3_COMMAND_LENGTH]
-	if r != CONFIGU3_COMMAND_LENGTH {
-		u.Message = fmt.Sprintf("An error occurred when trying to write the buffer")
-		// *Always* close the device when you error out.
+	r := C.LJUSB_Write(devHandle, sBuff, sBuffLength) //CONFIGU3_COMMAND_LENGTH)
+	switch op {
+	case configJack:
+		sendBuffer = (*[C.ulong(twentysix)]byte)(unsafe.Pointer(sBuff))[:C.ulong(twentysix):C.ulong(twentysix)]
+	case configIO:
+		sendBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(sBuff))[:C.ulong(twelve):C.ulong(twelve)]
+	case ain:
+		sendBuffer = (*[C.ulong(ten)]byte)(unsafe.Pointer(sBuff))[:C.ulong(ten):C.ulong(ten)]
+	case led:
+		sendBuffer = (*[C.ulong(nine)]byte)(unsafe.Pointer(sBuff))[:C.ulong(nine):C.ulong(nine)]
+	case portStateRead:
+		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
+	case portStateWrite:
+		sendBuffer = (*[C.ulong(fourteen)]byte)(unsafe.Pointer(sBuff))[:C.ulong(fourteen):C.ulong(fourteen)]
+	case portDirRead:
+		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
+	case portDirWrite:
+		sendBuffer = (*[C.ulong(fourteen)]byte)(unsafe.Pointer(sBuff))[:C.ulong(fourteen):C.ulong(fourteen)]
+	case tempSense:
+		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
+	case vReg:
+		sendBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(sBuff))[:C.ulong(eight):C.ulong(eight)]
+	}
+
+	// sendBuffer = (*[sBuffLength]byte)(unsafe.Pointer(sBuff))[:sBuffLength:sBuffLength]
+	if r != sBuffLength {
+		app.u3.Message = fmt.Sprintf("An error occurred when trying to write the buffer")
+		fmt.Println("2: ", app.u3.Message)
 		C.LJUSB_CloseDevice(devHandle)
 		return
 	}
 	// Read the result from the device.
 	// LJUSB_Read( handle, recBuffer, number of bytes to read)
 	rBuff := (*C.uchar)(unsafe.Pointer(&recBuffer[0]))
-	r = C.LJUSB_Read(devHandle, rBuff, CONFIGU3_RESPONSE_LENGTH)
-	recBuffer = (*[CONFIGU3_RESPONSE_LENGTH]byte)(unsafe.Pointer(rBuff))[:CONFIGU3_RESPONSE_LENGTH:CONFIGU3_RESPONSE_LENGTH]
-	if r != CONFIGU3_RESPONSE_LENGTH {
-		u.Message = fmt.Sprintf("An error occurred when trying to read from the U3")
+	rBuffLength := C.ulong(app.srData[op].recLength)
+	r = C.LJUSB_Read(devHandle, rBuff, rBuffLength)
+
+	switch op {
+	case configJack:
+		recBuffer = (*[C.ulong(thirtyeight)]byte)(unsafe.Pointer(rBuff))[:C.ulong(thirtyeight):C.ulong(thirtyeight)]
+	case configIO:
+		recBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(rBuff))[:C.ulong(twelve):C.ulong(twelve)]
+	case ain:
+		recBuffer = (*[C.ulong(eleven)]byte)(unsafe.Pointer(rBuff))[:C.ulong(eleven):C.ulong(eleven)]
+	case led:
+		recBuffer = (*[C.ulong(nine)]byte)(unsafe.Pointer(rBuff))[:C.ulong(nine):C.ulong(nine)]
+	case portStateRead:
+		recBuffer = (*[C.ulong(ten)]byte)(unsafe.Pointer(rBuff))[:C.ulong(ten):C.ulong(ten)]
+	case portStateWrite:
+		recBuffer = (*[C.ulong(nine)]byte)(unsafe.Pointer(rBuff))[:C.ulong(nine):C.ulong(nine)]
+	case portDirRead:
+		recBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(rBuff))[:C.ulong(twelve):C.ulong(twelve)]
+	case portDirWrite:
+		recBuffer = (*[C.ulong(fourteen)]byte)(unsafe.Pointer(rBuff))[:C.ulong(fourteen):C.ulong(fourteen)]
+	case tempSense:
+		recBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(rBuff))[:C.ulong(eight):C.ulong(eight)]
+	case vReg:
+		recBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(rBuff))[:C.ulong(eight):C.ulong(eight)]
+	}
+
+	// recBuffer = (*[rBuffLength]byte)(unsafe.Pointer(rBuff))[:rBuffLength:rBuffLength]
+	if r != rBuffLength {
+		app.u3.Message = fmt.Sprintf("An error occurred when trying to read from the U3 r: %v, rBuffLength: %v", r, rBuffLength)
+		fmt.Println("3: ", app.u3.Message, recBuffer)
 		C.LJUSB_CloseDevice(devHandle)
 		return
 	}
 	// Check the command for errors
-	if err := u.checkResponseForErrors(recBuffer); err != nil {
+	if err := app.srData[op].checkReturn(app.srData[op], recBuffer); err != nil {
+		// if err := app.checkResponse(op, recBuffer); err != nil {
 		C.LJUSB_CloseDevice(devHandle)
-		u.Message = fmt.Sprintf("%v", err)
+		app.u3.Message = fmt.Sprintf("%v", err)
+		fmt.Println("4: ", app.u3.Message)
 		return
 	}
-
-	// Parse the response into something useful
-	u.parseConfigU3Bytes(recBuffer)
-
+	switch op {
+	case configJack:
+		app.u3.parseConfigU3Bytes(recBuffer)
+	case configIO:
+		app.u3.parseBitBytes(recBuffer)
+	case portDirRead:
+		app.u3.parseDirBits(recBuffer)
+	}
 	//Close the device.
 	C.LJUSB_CloseDevice(devHandle)
-	u.Message = "No Message"
+	app.u3.Message = "No Message"
 
-}
-
-func buildConfigU3Bytes(sendBuffer []byte) {
-
-	checksum := 0
-
-	// Build up the bytes
-	//sendBuffer[0] = Checksum8
-	sendBuffer[1] = 0xF8
-	sendBuffer[2] = 0x0A
-	sendBuffer[3] = 0x08
-	//sendBuffer[4] = Checksum16 (LSB)
-	//sendBuffer[5] = Checksum16 (MSB)
-
-	// We just want to read, so we set the WriteMask to zero, and zero out the
-	// rest of the bytes.
-	sendBuffer[6] = 0
-	for i := 7; i < CONFIGU3_COMMAND_LENGTH; i++ {
-		sendBuffer[i] = 0
-	}
-
-	// Calculate and set the checksum16
-	checksum = calculateChecksum16(sendBuffer, CONFIGU3_COMMAND_LENGTH)
-	sendBuffer[4] = byte(checksum & 0xff)
-	sendBuffer[5] = byte((checksum / 256) & 0xff)
-
-	// Calculate and set the checksum8
-	sendBuffer[0] = calculateChecksum8(sendBuffer)
-
-	// The bytes have been set, and the checksum calculated. We are ready to
-	// write to the U3.
-}
-
-// Checks the response for any errors.
-func (u *U3) checkResponseForErrors(recBuffer []byte) error {
-	if recBuffer[0] == 0xB8 && recBuffer[1] == 0xB8 {
-		// If the packet is [ 0xB8, 0xB8 ], that's a bad checksum.
-		return fmt.Errorf("The U3 detected a bad checksum. Double check your checksum calculations and try again")
-	} else {
-		if recBuffer[1] != 0xF8 || recBuffer[2] != 0x10 || recBuffer[3] != 0x08 {
-			// Make sure the command bytes match what we expect.
-			return fmt.Errorf("Got the wrong command bytes back from the U3")
-		}
-
-		// Calculate the checksums.
-		checksum16 := calculateChecksum16(recBuffer, CONFIGU3_RESPONSE_LENGTH)
-		checksum8 := calculateChecksum8(recBuffer)
-
-		if checksum8 != recBuffer[0] || int(recBuffer[4]) != checksum16&0xff || int(recBuffer[5]) != ((checksum16/256)&0xff) {
-			// Check the checksum
-			return fmt.Errorf("Response had invalid checksum.\n%d != %d, %d != %d, %d != %d", checksum8, recBuffer[0], checksum16&0xff, recBuffer[4], ((checksum16 / 256) & 0xff), recBuffer[5])
-		} else {
-			if recBuffer[6] != 0 {
-				// Check the error code in the packet. See section 5.3 of the U3
-				// User's Guide for errorcode descriptions.
-				return fmt.Errorf("Command returned with an errorcode = %d", recBuffer[6])
-			}
-
-			return nil
-
-		}
-	}
-}
-
-func (u *U3) getSetPins(set bool) {
-	sendBuffer := make([]byte, BIT_CONFIGU3_COMMAND_LENGTH)
-	recBuffer := make([]byte, BIT_CONFIGU3_RESPONSE_LENGTH)
-
-	devHandle := C.LJUSB_OpenDevice(1, 0, C.U3_PRODUCT_ID)
-	if devHandle == nil {
-		u.Message = fmt.Sprintf("Couldn't open U3. Please connect one and try again")
-		C.LJUSB_CloseDevice(devHandle)
-		return
-	}
-
-	buildGetSetPinBytes(sendBuffer)
-
-	// Write the command to the device.
-	// LJUSB_Write( handle, sendBuffer, length of sendBuffer )
-	sBuff := (*C.uchar)(unsafe.Pointer(&sendBuffer[0]))
-	r := C.LJUSB_Write(devHandle, sBuff, BIT_CONFIGU3_COMMAND_LENGTH)
-	sendBuffer = (*[BIT_CONFIGU3_COMMAND_LENGTH]byte)(unsafe.Pointer(sBuff))[:BIT_CONFIGU3_COMMAND_LENGTH:BIT_CONFIGU3_COMMAND_LENGTH]
-	if r != BIT_CONFIGU3_COMMAND_LENGTH {
-		u.Message = fmt.Sprintf("An error occurred when trying to write the buffer")
-		// *Always* close the device when you error out.
-		C.LJUSB_CloseDevice(devHandle)
-		return
-	}
-	// Read the result from the device
-	rBuff := (*C.uchar)(unsafe.Pointer(&recBuffer[0]))
-	r = C.LJUSB_Read(devHandle, rBuff, BIT_CONFIGU3_RESPONSE_LENGTH)
-	recBuffer = (*[CONFIGU3_RESPONSE_LENGTH]byte)(unsafe.Pointer(rBuff))[:BIT_CONFIGU3_RESPONSE_LENGTH:BIT_CONFIGU3_RESPONSE_LENGTH]
-	if r != BIT_CONFIGU3_RESPONSE_LENGTH {
-		u.Message = fmt.Sprintf("An error occurred when trying to read from the U3")
-		C.LJUSB_CloseDevice(devHandle)
-		return
-	}
-	// Check the command for errors
-	if err := u.checkResponseForBitErrors(recBuffer); err != nil {
-		u.Message = fmt.Sprintf("%v", err)
-		C.LJUSB_CloseDevice(devHandle)
-		return
-	}
-
-	// Parse the response into something useful
-	u.parseBitBytes(recBuffer)
-	u.Message = "No Message"
-}
-
-func buildGetSetPinBytes(sendBuffer []byte) {
-
-	checksum := 0
-
-	// Build up the bytes
-	//sendBuffer[0] = Checksum8
-	sendBuffer[1] = 0xF8
-	sendBuffer[2] = 0x03
-	sendBuffer[3] = 0x0B
-	//sendBuffer[4] = Checksum16 (LSB)
-	//sendBuffer[5] = Checksum16 (MSB)
-
-	// We just want to read, so we set the WriteMask to zero, and zero out the
-	// rest of the bytes.
-	sendBuffer[6] = 0
-	for i := 7; i < BIT_CONFIGU3_COMMAND_LENGTH; i++ {
-		sendBuffer[i] = 0
-	}
-
-	// Calculate and set the checksum16
-	checksum = calculateChecksum16(sendBuffer, BIT_CONFIGU3_COMMAND_LENGTH)
-	sendBuffer[4] = byte(checksum & 0xff)
-	sendBuffer[5] = byte((checksum / 256) & 0xff)
-
-	// Calculate and set the checksum8
-	sendBuffer[0] = calculateChecksum8(sendBuffer)
-
-	// The bytes have been set, and the checksum calculated. We are ready to
-	// write to the U3.
-}
-
-func (u *U3) checkResponseForBitErrors(recBuffer []byte) error {
-	if recBuffer[0] == 0xB8 && recBuffer[1] == 0xB8 {
-		// If the packet is [ 0xB8, 0xB8 ], that's a bad checksum.
-		return fmt.Errorf("The U3 detected a bad checksum. Double check your checksum calculations and try again")
-	} else {
-		if recBuffer[1] != 0xF8 || recBuffer[2] != 0x03 || recBuffer[3] != 0x0B {
-			// Make sure the command bytes match what we expect.
-			return fmt.Errorf("Got the wrong command bytes back from the U3")
-		}
-
-		// Calculate the checksums.
-		checksum16 := calculateChecksum16(recBuffer, BIT_CONFIGU3_RESPONSE_LENGTH)
-		checksum8 := calculateChecksum8(recBuffer)
-
-		if checksum8 != recBuffer[0] || int(recBuffer[4]) != checksum16&0xff || int(recBuffer[5]) != ((checksum16/256)&0xff) {
-			// Check the checksum
-			return fmt.Errorf("Response had invalid checksum.\n%d != %d, %d != %d, %d != %d", checksum8, recBuffer[0], checksum16&0xff, recBuffer[4], ((checksum16 / 256) & 0xff), recBuffer[5])
-		} else {
-			if recBuffer[6] != 0 {
-				// Check the error code in the packet. See section 5.3 of the U3
-				// User's Guide for errorcode descriptions.
-				return fmt.Errorf("Command returned with an errorcode = %d", recBuffer[6])
-			}
-
-			return nil
-
-		}
-	}
 }
