@@ -71,5 +71,38 @@ func (app *application) configure(w http.ResponseWriter, r *http.Request) {
 
 func (app *application) measure(w http.ResponseWriter, r *http.Request) {
 
+	app.u3SendRec(portStateRead, 0x00)
+	for i, pin := range app.u3.FIO {
+		app.srData[ain].byte8 = 0x00
+		if pin.AD == "Analog" {
+			app.srData[ain].byte8 = byte(i) | 0x40 //for long settling
+			app.u3SendRec(ain, 0x00)
+		}
+	}
+	for i, pin := range app.u3.EIO {
+		app.srData[ain].byte8 = 0x00
+		if pin.AD == "Analog" {
+			app.srData[ain].byte8 = byte(i+8) | 0x40 //for long settling
+			app.u3SendRec(ain, 0x00)
+		}
+	}
+	app.render(w, r, "measure.page.html", app.u3)
+}
+
+func (app *application) updateDigital(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	fmt.Println("postform", r.PostForm)
+	//pulls the digitalWrite settings from the web form and populates app.u3
+	err = app.u3.pullDigitalOutput(r.PostForm)
+	if err != nil {
+		fmt.Println("pullDigitalOutput returned error", err)
+	}
+	app.copyToWirteDigitalOutput(portStateWrite)
+	writeMask := byte(0x01)
+	app.u3SendRec(portStateWrite, writeMask)
 	app.render(w, r, "measure.page.html", app.u3)
 }

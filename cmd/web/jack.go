@@ -23,12 +23,12 @@ from the flash device memory or from the voltaile device memory.  It is not
 instanciated directly.  It is a component of the U3 type.
 */
 type Pin struct {
-	AD            string  //Analog or digital
-	IO            string  //Input or Output
-	AnalogRead    int     //A/D convertor raw read
-	AnalogVoltage float64 //Analog read convergted to voltage
-	DigitalRead   int     //only one and zero allowed
-	DigitalWrite  int     //only one and zero allowed
+	AD            string //Analog or digital
+	IO            string //Input or Output
+	AnalogRead    uint16 //A/D convertor raw read
+	AnalogVoltage string //Analog read convergted to voltage
+	DigitalRead   int    //only one and zero allowed
+	DigitalWrite  int    //only one and zero allowed
 }
 
 /*
@@ -138,13 +138,15 @@ func buildU3srData() u3srData {
 		},
 		//the following are all subcommands of the "feedback" command.
 		ain: &u3srElement{ //read analog pin voltage
-			sendLength: 10,
-			recLength:  11,
-			byte1:      0xF8, //per device low level function refrence
-			byte2:      3,    //number of words (two byte pairs) startying with byte 6
-			byte3:      0x00,
-			byte6:      0,
-			byte7:      1, //feedback subcommand
+			sendLength:  10,
+			recLength:   12,
+			byte1:       0xF8, //per device low level function refrence
+			byte2:       2,    //number of words (two byte pairs) startying with byte 6
+			byte3:       0x00,
+			byte6:       0,
+			byte7:       1, //feedback subcommand
+			checkReturn: checkFeedback,
+			buildBytes:  buildAINReadBuffer,
 		},
 		led: &u3srElement{ //set led state (on or off)
 			sendLength: 9,
@@ -156,22 +158,26 @@ func buildU3srData() u3srData {
 			byte7:      9, //feedback subcommand
 		},
 		portStateRead: &u3srElement{ //read the state of digital input pins, high or low
-			sendLength: 8,
-			recLength:  10,
-			byte1:      0xF8,
-			byte2:      2, //number of words (two byte pairs) startying with byte 6
-			byte3:      0x00,
-			byte6:      0,
-			byte7:      10, //feedback subcommand
+			sendLength:  8,
+			recLength:   12,
+			byte1:       0xF8,
+			byte2:       1, //number of words (two byte pairs) startying with byte 6
+			byte3:       0x00,
+			byte6:       0,
+			byte7:       26, //feedback subcommand
+			checkReturn: checkFeedback,
+			buildBytes:  buildPortStateReadBuffer,
 		},
 		portStateWrite: &u3srElement{ //write the state of digital output pins (high or low)
-			sendLength: 14,
-			recLength:  11,
-			byte1:      0xF8,
-			byte2:      7, //number of words (two byte pairs) startying with byte 6
-			byte3:      0x00,
-			byte6:      0,
-			byte7:      27, //feedback subcommand
+			sendLength:  14,
+			recLength:   10,
+			byte1:       0xF8,
+			byte2:       4, //number of words (two byte pairs) startying with byte 6
+			byte3:       0x00,
+			byte6:       0,
+			byte7:       27, //feedback subcommand
+			checkReturn: checkFeedback,
+			buildBytes:  buildPortStateWriteBuffer,
 		},
 		portDirRead: &u3srElement{ //read the direction of the digital pins, input or output
 			sendLength:  8,
@@ -301,6 +307,22 @@ func buildPortDirReadBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) 
 	addChecksum(sr, sendBuffer)
 }
 
+func buildPortStateReadBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) {
+	copyHead(sr, sendBuffer)
+	sendBuffer[6] = writeMask
+	sendBuffer[7] = sr.byte7
+	addChecksum(sr, sendBuffer)
+}
+
+func buildAINReadBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) {
+	copyHead(sr, sendBuffer)
+	sendBuffer[6] = writeMask
+	sendBuffer[7] = sr.byte7
+	sendBuffer[8] = sr.byte8
+	sendBuffer[9] = 0x00
+	addChecksum(sr, sendBuffer)
+}
+
 /*
 The feedback functions all have a different send and recieve buffer templetaes.
 Hence all send buffer builds will be different.
@@ -310,9 +332,23 @@ func buildPortDirWriteBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte)
 	for i := 8; i < sr.sendLength; i++ {
 		sendBuffer[i] = 0x00
 	}
-	sendBuffer[8] = 0xf0
+	sendBuffer[8] = 0xff
 	sendBuffer[9] = 0xff
-	sendBuffer[10] = 0x0f
+	sendBuffer[10] = 0xff
+	sendBuffer[11] = sr.byte11
+	sendBuffer[12] = sr.byte12
+	sendBuffer[13] = sr.byte13
+	addChecksum(sr, sendBuffer)
+}
+
+func buildPortStateWriteBuffer(sr *u3srElement, sendBuffer []byte, writeMask byte) {
+	copyHead(sr, sendBuffer)
+	for i := 8; i < sr.sendLength; i++ {
+		sendBuffer[i] = 0x00
+	}
+	sendBuffer[8] = sr.byte8
+	sendBuffer[9] = sr.byte9
+	sendBuffer[10] = sr.byte10
 	sendBuffer[11] = sr.byte11
 	sendBuffer[12] = sr.byte12
 	sendBuffer[13] = sr.byte13
@@ -450,6 +486,61 @@ func (u *U3) parseDirBits(recBuffer []byte) {
 				u.CIO[i].IO = "Output"
 			}
 		}
+	}
+}
+
+func (u *U3) parseStateBits(recBuffer []byte) {
+	for i := 0; i < 8; i++ {
+		if i > 3 {
+			u.FIO[i].DigitalRead = 0
+			if recBuffer[9]&(1<<i) != 0 {
+				u.FIO[i].DigitalRead = 1
+			}
+		}
+		u.EIO[i].DigitalRead = 0
+		if recBuffer[10]&(1<<i) != 0 {
+			u.EIO[i].DigitalRead = 1
+		}
+		if i < 4 {
+			u.CIO[i].DigitalRead = 0
+			if recBuffer[11]&(1<<i) != 0 {
+				u.CIO[i].DigitalRead = 1
+			}
+		}
+	}
+}
+
+const (
+	max      = 65535.0
+	hvSlope  = 10.3 / max
+	slope    = 2.44 / max
+	hvOffset = -5.0
+	offset   = -0.527
+)
+
+func (u *U3) parseAINBits(b byte, recBuffer []byte) {
+	ch := int(b & 0x1F)
+	fmt.Println("Channel: ", ch)
+	if ch < 8 {
+		if u.FIO[ch].AD == "Analog" {
+			read := uint16(recBuffer[9]) + uint16(recBuffer[10])*256
+			u.FIO[ch].AnalogRead = read
+			if ch < 4 {
+				u.FIO[ch].AnalogVoltage = fmt.Sprintf("%0.3f",
+					(float64(read)*hvSlope+hvOffset)*2)
+				return
+			}
+			u.FIO[ch].AnalogVoltage = fmt.Sprintf("%0.3f",
+				(float64(read)*slope+offset)*2)
+			return
+		}
+	}
+	ch -= 8
+	if u.EIO[ch].AD == "Analog" {
+		read := uint16(recBuffer[9]) + uint16(recBuffer[10])*256
+		u.EIO[ch].AnalogRead = read
+		u.EIO[ch].AnalogVoltage = fmt.Sprintf("%0.3f",
+			(float64(read)*slope+offset)*2)
 	}
 }
 

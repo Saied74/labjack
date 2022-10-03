@@ -167,21 +167,94 @@ func (app *application) copyToWriteJack(op string) {
 
 func (app *application) copyToWriteDirection(op string) {
 	app.srData[op].byte12 = 0x00
+	app.srData[op].byte9 = 0x00
 	for i, val := range app.u3.EIO {
 		if val.IO == "Output" {
 			app.srData[op].byte12 = app.srData[op].byte12 | (1 << i)
+			app.srData[op].byte9 = app.srData[op].byte9 | (1 << i)
 		}
 	}
 	app.srData[op].byte11 = 0x00
+	app.srData[op].byte8 = 0x00
 	for i, val := range app.u3.FIO {
 		if i > 3 && val.IO == "Output" {
 			app.srData[op].byte11 = app.srData[op].byte11 | (1 << i)
+			app.srData[op].byte8 = app.srData[op].byte8 | (1 << i)
 		}
 	}
 	app.srData[op].byte13 = 0x00
+	app.srData[op].byte10 = 0x00
 	for i, val := range app.u3.CIO {
 		if i < 4 && val.IO == "Output" {
 			app.srData[op].byte13 = app.srData[op].byte13 | (1 << i)
+			app.srData[op].byte10 = app.srData[op].byte10 | (1 << i)
 		}
 	}
+}
+
+func (app *application) copyToWirteDigitalOutput(op string) {
+
+	app.srData[op].byte12 = 0x00
+	app.srData[op].byte9 = 0x00
+	for i, val := range app.u3.EIO {
+		if val.IO == "Output" {
+			app.srData[op].byte12 = app.srData[op].byte12 | (byte(val.DigitalWrite) << i)
+			app.srData[op].byte9 = app.srData[op].byte9 | (1 << i)
+		}
+	}
+	app.srData[op].byte11 = 0x00
+	app.srData[op].byte8 = 0x00
+	for i, val := range app.u3.FIO {
+		if i > 3 && val.IO == "Output" {
+			app.srData[op].byte11 = app.srData[op].byte11 | (byte(val.DigitalWrite) << i)
+			app.srData[op].byte8 = app.srData[op].byte8 | (1 << i)
+		}
+	}
+	app.srData[op].byte13 = 0x00
+	app.srData[op].byte10 = 0x00
+	for i, val := range app.u3.CIO {
+		if i < 4 && val.IO == "Output" {
+			app.srData[op].byte13 = app.srData[op].byte13 | (byte(val.DigitalWrite) << i)
+			app.srData[op].byte10 = app.srData[op].byte10 | (1 << i)
+		}
+	}
+}
+
+func (u *U3) pullDigitalOutput(r url.Values) error {
+	cio := []string{"cioD0", "cioD1", "cioD2", "cioD3"}
+	for i, c := range cio {
+		vol, ok := r[c]
+		if ok {
+			u.CIO[i].DigitalWrite = 1
+			if vol[0] == "2" {
+				u.CIO[i].DigitalWrite = 0
+			}
+		}
+	}
+
+	eio := []string{"eioD0", "eioD1", "eioD2", "eioD3", "eioD4", "eioD5", "eioD6", "eioD7"}
+	for i, c := range eio {
+		val, ok := r[c]
+		if ok {
+			u.EIO[i].DigitalWrite = 1
+			if val[0] == "2" {
+				u.EIO[i].DigitalWrite = 0
+			}
+		}
+	}
+
+	fio := []string{"fioD0", "fioD1", "fioD2", "fioD3", "fioD4", "fioD5", "fioD6", "fioD7"}
+	for i, c := range fio {
+		val, ok := r[c]
+		if ok {
+			u.FIO[i].DigitalWrite = 1
+			if val[0] == "2" {
+				u.FIO[i].DigitalWrite = 0
+			}
+		}
+	}
+	// for _, item := range u.FIO {
+	// 	fmt.Println("FIO.DigitalWrite", item.DigitalWrite)
+	// }
+	return nil
 }

@@ -99,6 +99,7 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("/getConfig", app.getConfig)
 	mux.HandleFunc("/configure", app.configure)
 	mux.HandleFunc("/measure", app.measure)
+	mux.HandleFunc("/updateDigital", app.updateDigital)
 	mux.HandleFunc("/adjustments", app.notImplemented)
 	mux.HandleFunc("/readjust", app.notImplemented)
 	return mux

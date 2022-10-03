@@ -27,6 +27,7 @@ const (
 	eleven      = 11
 	twelve      = 12
 	fourteen    = 14
+	fifteen = 15
 	twentysix   = 26
 	thirtyeight = 38
 )
@@ -75,17 +76,17 @@ func (app *application) u3SendRec(op string, mask byte) {
 	case configIO:
 		recBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(rBuff))[:C.ulong(twelve):C.ulong(twelve)]
 	case ain:
-		recBuffer = (*[C.ulong(eleven)]byte)(unsafe.Pointer(rBuff))[:C.ulong(eleven):C.ulong(eleven)]
+		recBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(rBuff))[:C.ulong(twelve):C.ulong(twelve)]
 	case led:
 		recBuffer = (*[C.ulong(nine)]byte)(unsafe.Pointer(rBuff))[:C.ulong(nine):C.ulong(nine)]
 	case portStateRead:
-		recBuffer = (*[C.ulong(ten)]byte)(unsafe.Pointer(rBuff))[:C.ulong(ten):C.ulong(ten)]
+		recBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(rBuff))[:C.ulong(twelve):C.ulong(twelve)]
 	case portStateWrite:
-		recBuffer = (*[C.ulong(nine)]byte)(unsafe.Pointer(rBuff))[:C.ulong(nine):C.ulong(nine)]
+		recBuffer = (*[C.ulong(ten)]byte)(unsafe.Pointer(rBuff))[:C.ulong(ten):C.ulong(ten)]
 	case portDirRead:
 		recBuffer = (*[C.ulong(twelve)]byte)(unsafe.Pointer(rBuff))[:C.ulong(twelve):C.ulong(twelve)]
 	case portDirWrite:
-		recBuffer = (*[C.ulong(fourteen)]byte)(unsafe.Pointer(rBuff))[:C.ulong(fourteen):C.ulong(fourteen)]
+		recBuffer = (*[C.ulong(ten)]byte)(unsafe.Pointer(rBuff))[:C.ulong(ten):C.ulong(ten)]
 	case tempSense:
 		recBuffer = (*[C.ulong(eight)]byte)(unsafe.Pointer(rBuff))[:C.ulong(eight):C.ulong(eight)]
 	case vReg:
@@ -99,6 +100,8 @@ func (app *application) u3SendRec(op string, mask byte) {
 		C.LJUSB_CloseDevice(devHandle)
 		return
 	}
+	fmt.Printf("Send Buffer (op: %s): %v\n", op, sendBuffer)
+	fmt.Printf("Rec Buffer (op: %s): %v\n", op, recBuffer)
 	// Check the command for errors
 	if err := app.srData[op].checkReturn(app.srData[op], recBuffer); err != nil {
 		// if err := app.checkResponse(op, recBuffer); err != nil {
@@ -114,6 +117,7 @@ func (app *application) u3SendRec(op string, mask byte) {
 		refactor them and pass a pointer to the instance of U3 as the first Parameter
 		(just like invoking the method on the structure does)
 	*/
+
 	switch op {
 	case configJack:
 		app.u3.parseConfigU3Bytes(recBuffer)
@@ -121,6 +125,10 @@ func (app *application) u3SendRec(op string, mask byte) {
 		app.u3.parseBitBytes(recBuffer)
 	case portDirRead:
 		app.u3.parseDirBits(recBuffer)
+	case portStateRead:
+		app.u3.parseStateBits(recBuffer)
+	case ain:
+		app.u3.parseAINBits(sendBuffer[8], recBuffer)
 	}
 	//Close the device.
 	C.LJUSB_CloseDevice(devHandle)

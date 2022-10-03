@@ -8,7 +8,7 @@
 </div>
 <hr>
 <div class="row">
-
+<form action="/updateDigital" method="post">
   <div class="col-sm-12">
 <table class="table table-striped">
   <thead>
@@ -44,7 +44,17 @@
       <th scope="row">Read</th>
       {{range $n, $val := .EIO}}
       <td class="text-center">
-        {{if eq $val.AD "Digital"}}{{$val.DigitalRead}}{{end}}
+        {{if eq $val.AD "Digital"}}
+          {{if eq $val.IO "Input"}}
+            {{$val.DigitalRead}}
+          {{end}}
+          {{if eq $val.IO "Output"}}
+          <select class="form-select" aria-label="EIOD{{$n}}" name="eioD{{$n}}">
+            <option value="1" {{if eq $val.DigitalWrite 1}}selected{{end}}>1</option>
+            <option value="2" {{if eq $val.DigitalWrite 0}}selected{{end}}>0</option>
+          </select>
+          {{end}}
+          {{end}}
         {{if eq $val.AD "Analog"}}{{$val.AnalogRead}}{{end}}
       </td>
       {{end}}
@@ -81,10 +91,20 @@
       <th scope="row">Read</th>
       {{range $n, $val := .FIO}}
       <td class="text-center">
-        {{if eq $val.AD "Digital"}}{{$val.DigitalRead}}{{end}}
+      {{if eq $val.AD "Digital"}}
+        {{if eq $val.IO "Input"}}
+          {{$val.DigitalRead}}
+        {{end}}
+        {{if eq $val.IO "Output"}}
+        <select class="form-select" aria-label="FIOD{{$n}}" name="fioD{{$n}}">
+          <option value="1" {{if eq $val.DigitalWrite 1}}selected{{end}}>1</option>
+          <option value="2" {{if eq $val.DigitalWrite 0}}selected{{end}}>0</option>
+        </select>
+        {{end}}
+        {{end}}
         {{if eq $val.AD "Analog"}}{{$val.AnalogRead}}{{end}}
-      </td>
-      {{end}}
+        {{end}}
+        </td>
     </tr>
     <tr>
       <th scope="row">Voltage</th>
@@ -117,22 +137,32 @@
       <th scope="row">Read</th>
       {{range $n, $val := .CIO}}
       <td class="text-center">
-        {{if eq $val.AD "Digital"}}{{$val.DigitalRead}}{{end}}
-        {{if eq $val.AD "Analog"}}{{$val.AnalogRead}}{{end}}
-      </td>
-      {{end}}
+      {{if eq $val.AD "Digital"}}
+        {{if eq $val.IO "Input"}}
+          {{$val.DigitalRead}}{{end}}
+        {{end}}
+        {{if eq $val.IO "Output"}}
+        <select class="form-select" aria-label="CIOD{{$n}}" name="cioD{{$n}}">
+          <option value="1" {{if eq $val.DigitalWrite 1}}selected{{end}}>1</option>
+          <option value="2" {{if eq $val.DigitalWrite 0}}selected{{end}}>0</option>
+        </select>
+        {{end}}
+        {{end}}
+        </td>
     </tr>
-    <tr>
+    <!-- <tr>
       <th scope="row">Voltage</th>
       {{range $n, $val := .CIO}}
       <td class="text-center">
         {{if eq $val.AD "Analog"}}{{$val.AnalogVoltage}}{{end}}
       </td>
       {{end}}
-    </tr>
+    </tr> -->
 
   </tbody>
 </table>
+<button type="submit" class="btn btn-primary">Update Digital</button>
+</form>
     </div>
 
 </div>
